@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+*.log
+
+vscode-extension/node_modules/
+vscode-extension/dist/
+
+.DS_Store

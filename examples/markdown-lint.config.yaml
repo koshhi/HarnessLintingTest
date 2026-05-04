@@ -1,0 +1,7 @@
+rules:
+  metadata-required-non-empty:
+    field: title
+  no-trailing-spaces:
+    enabled: true
+  no-multiple-blank-lines:
+    enabled: true

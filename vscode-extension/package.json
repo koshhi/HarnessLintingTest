@@ -1,0 +1,39 @@
+{
+  "name": "markdown-lint-vscode-extension",
+  "displayName": "Markdown Lint Prototype",
+  "description": "VS Code diagnostics for the local Markdown linter prototype.",
+  "version": "0.0.1",
+  "publisher": "local",
+  "private": true,
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Linters"
+  ],
+  "activationEvents": [
+    "onLanguage:markdown",
+    "onCommand:markdownLint.refreshDiagnostics"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "markdownLint.refreshDiagnostics",
+        "title": "Markdown Lint: Refresh Diagnostics"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "node ./scripts/build.mjs",
+    "watch": "node ./scripts/build.mjs --watch"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/vscode": "^1.90.0",
+    "esbuild": "^0.25.12"
+  },
+  "dependencies": {
+    "yaml": "^2.8.4"
+  }
+}

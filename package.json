@@ -1,0 +1,26 @@
+{
+  "name": "harnesslintingtest",
+  "version": "1.0.0",
+  "description": "Simple Markdown linter prototype",
+  "type": "module",
+  "bin": {
+    "markdown-lint": "./src/cli.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "lint:md": "node src/cli.ts"
+  },
+  "keywords": [
+    "markdown",
+    "linter",
+    "typescript"
+  ],
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
+  },
+  "dependencies": {
+    "yaml": "^2.8.4"
+  }
+}
