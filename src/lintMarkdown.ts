@@ -1,4 +1,5 @@
-import { resolveLintConfig, type LintConfig } from "./config.ts";
+import { resolveLintConfigForFile, type LintConfig } from "./config.ts";
+import { parse as parseYaml } from "yaml";
 
 export type LintIssue = {
   ruleId: string;
@@ -13,15 +14,26 @@ export type LintResult = {
   issues: LintIssue[];
 };
 
+export type LintOptions = {
+  config?: LintConfig;
+  filePath?: string;
+};
+
 type FrontMatter = {
-  fields: Record<string, string>;
+  fields: Record<string, unknown>;
   lineNumbers: Record<string, number>;
 };
 
-export function lintMarkdown(text: string, config?: LintConfig): LintResult {
+export function lintMarkdown(text: string, config?: LintConfig): LintResult;
+export function lintMarkdown(text: string, options?: LintOptions): LintResult;
+export function lintMarkdown(
+  text: string,
+  configOrOptions?: LintConfig | LintOptions,
+): LintResult {
   const issues: LintIssue[] = [];
   const lines = text.split("\n");
-  const resolvedConfig = resolveLintConfig(config);
+  const { config, filePath } = normalizeLintOptions(configOrOptions);
+  const resolvedConfig = resolveLintConfigForFile(config, filePath);
 
   if (resolvedConfig.rules["metadata-required-non-empty"].enabled) {
     validateRequiredMetadata(
@@ -37,6 +49,10 @@ export function lintMarkdown(text: string, config?: LintConfig): LintResult {
 
   if (resolvedConfig.rules["no-multiple-blank-lines"].enabled) {
     validateMultipleBlankLines(lines, issues);
+  }
+
+  if (resolvedConfig.rules["require-links"].enabled) {
+    validateRequireLinks(lines, issues);
   }
 
   issues.sort(compareIssues);
@@ -78,7 +94,7 @@ function validateRequiredMetadata(
     return;
   }
 
-  if (value.trim() === "") {
+  if (isMetadataValueEmpty(value)) {
     issues.push({
       ruleId: "metadata-required-non-empty",
       message: `Required metadata field "${requiredField}" cannot be empty.`,
@@ -100,7 +116,16 @@ function parseFrontMatter(lines: string[]): FrontMatter | null {
     return null;
   }
 
-  const fields: Record<string, string> = {};
+  const frontMatterText = lines.slice(1, closingIndex).join("\n");
+  let parsedFrontMatter: unknown;
+
+  try {
+    parsedFrontMatter = parseYaml(frontMatterText);
+  } catch {
+    return null;
+  }
+
+  const fields = isRecord(parsedFrontMatter) ? parsedFrontMatter : {};
   const lineNumbers: Record<string, number> = {};
 
   for (let index = 1; index < closingIndex; index += 1) {
@@ -112,14 +137,13 @@ function parseFrontMatter(lines: string[]): FrontMatter | null {
     }
 
     const key = line.slice(0, separatorIndex).trim();
-    const value = line.slice(separatorIndex + 1).trim();
-
     if (!key) {
       continue;
     }
 
-    fields[key] = value;
-    lineNumbers[key] = index + 1;
+    if (!(key in lineNumbers)) {
+      lineNumbers[key] = index + 1;
+    }
   }
 
   return { fields, lineNumbers };
@@ -163,6 +187,25 @@ function validateMultipleBlankLines(lines: string[], issues: LintIssue[]): void 
   }
 }
 
+function validateRequireLinks(lines: string[], issues: LintIssue[]): void {
+  const markdown = lines.join("\n");
+  const hasMarkdownLink = /\[[^\]]+\]\([^)]+\)/.test(markdown);
+  const hasAutoLink = /<https?:\/\/[^>]+>/.test(markdown);
+  const hasBareUrl = /https?:\/\/\S+/.test(markdown);
+
+  if (hasMarkdownLink || hasAutoLink || hasBareUrl) {
+    return;
+  }
+
+  issues.push({
+    ruleId: "require-links",
+    message: "Document must contain at least one link.",
+    severity: "error",
+    line: 1,
+    column: 1,
+  });
+}
+
 function compareIssues(left: LintIssue, right: LintIssue): number {
   if (left.line !== right.line) {
     return left.line - right.line;
@@ -173,4 +216,36 @@ function compareIssues(left: LintIssue, right: LintIssue): number {
   }
 
   return left.ruleId.localeCompare(right.ruleId);
+}
+
+function isMetadataValueEmpty(value: unknown): boolean {
+  if (value === null || value === undefined) {
+    return true;
+  }
+
+  if (typeof value === "string") {
+    return value.trim() === "";
+  }
+
+  if (Array.isArray(value)) {
+    return value.length === 0;
+  }
+
+  return false;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeLintOptions(configOrOptions?: LintConfig | LintOptions): LintOptions {
+  if (!configOrOptions) {
+    return {};
+  }
+
+  if ("config" in configOrOptions || "filePath" in configOrOptions) {
+    return configOrOptions;
+  }
+
+  return { config: configOrOptions };
 }

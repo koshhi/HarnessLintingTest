@@ -10,7 +10,7 @@ It includes:
 
 - A CLI that lints one or more Markdown files.
 - Config loading from JSON or YAML.
-- A VS Code extension that publishes diagnostics in the editor and `Problems` panel.
+- A VS Code extension that publishes workspace-wide diagnostics in the editor and `Problems` panel.
 - Example Markdown content and tests.
 
 ## Requirements
@@ -56,6 +56,11 @@ npm run lint:md -- --config examples/markdown-lint.config.yaml examples/sample.m
 - `metadata-required-non-empty`
 - `no-trailing-spaces`
 - `no-multiple-blank-lines`
+- `require-links`
+
+Rule documentation:
+
+- [Linting Rules Overview](./docs/rules-documentation/linting-rules-overview.md)
 
 ## Config Files
 
@@ -75,15 +80,26 @@ rules:
     enabled: true
   no-multiple-blank-lines:
     enabled: true
+  require-links:
+    enabled: true
+overrides:
+  - files: ["README.md"]
+    rules:
+      require-links:
+        enabled: false
 ```
+
+`overrides` lets you change rules by file name or path pattern. For example, the config above requires links by default but disables that rule for `README.md`.
 
 ## VS Code Extension
 
-The extension lives in [vscode-extension](./vscode-extension) and validates Markdown files on:
+The extension lives in [vscode-extension](./vscode-extension) and validates Markdown files across the workspace, including files that are not already open in an editor. It refreshes diagnostics on:
 
 - open
 - change
 - save
+- Markdown file creation
+- config file changes
 - manual refresh through `Markdown Lint: Refresh Diagnostics`
 
 To run it locally:

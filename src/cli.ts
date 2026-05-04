@@ -76,7 +76,10 @@ export async function runCli(args: string[]): Promise<number> {
       return 2;
     }
 
-    const result = lintMarkdown(text, config);
+    const result = lintMarkdown(text, {
+      config,
+      filePath,
+    });
 
     fileResults.push({
       filePath,

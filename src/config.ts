@@ -1,5 +1,5 @@
 import { access, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import { parse as parseYaml } from "yaml";
 
@@ -11,12 +11,23 @@ export type MetadataRequiredNonEmptyRuleConfig = ToggleRuleConfig & {
   field?: string;
 };
 
+export type RequireLinksRuleConfig = ToggleRuleConfig;
+
+export type RuleSetConfig = {
+  "metadata-required-non-empty"?: MetadataRequiredNonEmptyRuleConfig;
+  "no-trailing-spaces"?: ToggleRuleConfig;
+  "no-multiple-blank-lines"?: ToggleRuleConfig;
+  "require-links"?: RequireLinksRuleConfig;
+};
+
+export type LintOverrideConfig = {
+  files: string[];
+  rules?: RuleSetConfig;
+};
+
 export type LintConfig = {
-  rules?: {
-    "metadata-required-non-empty"?: MetadataRequiredNonEmptyRuleConfig;
-    "no-trailing-spaces"?: ToggleRuleConfig;
-    "no-multiple-blank-lines"?: ToggleRuleConfig;
-  };
+  rules?: RuleSetConfig;
+  overrides?: LintOverrideConfig[];
 };
 
 export type ResolvedLintConfig = {
@@ -31,6 +42,9 @@ export type ResolvedLintConfig = {
     "no-multiple-blank-lines": {
       enabled: boolean;
     };
+    "require-links": {
+      enabled: boolean;
+    };
   };
 };
 
@@ -42,19 +56,33 @@ const DEFAULT_CONFIG_FILE_NAMES = [
 ];
 
 export function resolveLintConfig(config?: LintConfig): ResolvedLintConfig {
+  return resolveLintConfigForFile(config);
+}
+
+export function resolveLintConfigForFile(
+  config?: LintConfig,
+  filePath?: string,
+): ResolvedLintConfig {
+  const normalizedConfig = normalizeLintConfig(config);
+  const overrideRules = filePath
+    ? collectOverrideRules(normalizedConfig.overrides, filePath)
+    : undefined;
+  const mergedRules = mergeRuleSets(normalizedConfig.rules, overrideRules);
+
   return {
     rules: {
       "metadata-required-non-empty": {
-        enabled: config?.rules?.["metadata-required-non-empty"]?.enabled ?? true,
-        field:
-          config?.rules?.["metadata-required-non-empty"]?.field ??
-          DEFAULT_REQUIRED_METADATA_FIELD,
+        enabled: mergedRules?.["metadata-required-non-empty"]?.enabled ?? true,
+        field: mergedRules?.["metadata-required-non-empty"]?.field ?? DEFAULT_REQUIRED_METADATA_FIELD,
       },
       "no-trailing-spaces": {
-        enabled: config?.rules?.["no-trailing-spaces"]?.enabled ?? true,
+        enabled: mergedRules?.["no-trailing-spaces"]?.enabled ?? true,
       },
       "no-multiple-blank-lines": {
-        enabled: config?.rules?.["no-multiple-blank-lines"]?.enabled ?? true,
+        enabled: mergedRules?.["no-multiple-blank-lines"]?.enabled ?? true,
+      },
+      "require-links": {
+        enabled: mergedRules?.["require-links"]?.enabled ?? false,
       },
     },
   };
@@ -131,17 +159,53 @@ function normalizeLintConfig(input: unknown): LintConfig {
   }
 
   const rules = isRecord(input.rules) ? input.rules : undefined;
+  const overrides = Array.isArray(input.overrides) ? input.overrides : undefined;
 
   return {
-    rules: {
-      "metadata-required-non-empty": normalizeMetadataRule(
-        rules?.["metadata-required-non-empty"],
-      ),
-      "no-trailing-spaces": normalizeToggleRule(rules?.["no-trailing-spaces"]),
-      "no-multiple-blank-lines": normalizeToggleRule(
-        rules?.["no-multiple-blank-lines"],
-      ),
-    },
+    rules: normalizeRuleSet(rules),
+    overrides: overrides?.map(normalizeOverride),
+  };
+}
+
+function normalizeOverride(input: unknown): LintOverrideConfig {
+  if (!isRecord(input)) {
+    throw new Error('Each override must be an object.');
+  }
+
+  if (!Array.isArray(input.files) || input.files.length === 0) {
+    throw new Error('Each override must include a non-empty "files" array.');
+  }
+
+  const files = input.files.map((value) => {
+    if (typeof value !== "string" || value.trim() === "") {
+      throw new Error('Override file patterns must be non-empty strings.');
+    }
+
+    return value.trim();
+  });
+
+  const rules = isRecord(input.rules) ? input.rules : undefined;
+
+  return {
+    files,
+    rules: normalizeRuleSet(rules),
+  };
+}
+
+function normalizeRuleSet(input: Record<string, unknown> | undefined): RuleSetConfig | undefined {
+  if (!input) {
+    return undefined;
+  }
+
+  return {
+    "metadata-required-non-empty": normalizeMetadataRule(
+      input["metadata-required-non-empty"],
+    ),
+    "no-trailing-spaces": normalizeToggleRule(input["no-trailing-spaces"]),
+    "no-multiple-blank-lines": normalizeToggleRule(
+      input["no-multiple-blank-lines"],
+    ),
+    "require-links": normalizeToggleRule(input["require-links"]),
   };
 }
 
@@ -156,12 +220,20 @@ function normalizeMetadataRule(input: unknown): MetadataRequiredNonEmptyRuleConf
 
   const result: MetadataRequiredNonEmptyRuleConfig = {};
 
-  if (typeof input.enabled === "boolean") {
+  if (input.enabled !== undefined) {
+    if (typeof input.enabled !== "boolean") {
+      throw new Error('Rule "metadata-required-non-empty.enabled" must be a boolean.');
+    }
+
     result.enabled = input.enabled;
   }
 
-  if (typeof input.field === "string") {
-    result.field = input.field;
+  if (input.field !== undefined) {
+    if (typeof input.field !== "string" || input.field.trim() === "") {
+      throw new Error('Rule "metadata-required-non-empty.field" must be a non-empty string.');
+    }
+
+    result.field = input.field.trim();
   }
 
   return result;
@@ -178,7 +250,11 @@ function normalizeToggleRule(input: unknown): ToggleRuleConfig | undefined {
 
   const result: ToggleRuleConfig = {};
 
-  if (typeof input.enabled === "boolean") {
+  if (input.enabled !== undefined) {
+    if (typeof input.enabled !== "boolean") {
+      throw new Error('Rule "enabled" must be a boolean.');
+    }
+
     result.enabled = input.enabled;
   }
 
@@ -187,4 +263,97 @@ function normalizeToggleRule(input: unknown): ToggleRuleConfig | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function collectOverrideRules(
+  overrides: LintOverrideConfig[] | undefined,
+  filePath: string,
+): RuleSetConfig | undefined {
+  if (!overrides || overrides.length === 0) {
+    return undefined;
+  }
+
+  let mergedRules: RuleSetConfig | undefined;
+
+  for (const override of overrides) {
+    if (override.files.some((pattern) => matchesPattern(filePath, pattern))) {
+      mergedRules = mergeRuleSets(mergedRules, override.rules);
+    }
+  }
+
+  return mergedRules;
+}
+
+function mergeRuleSets(
+  baseRules: RuleSetConfig | undefined,
+  overrideRules: RuleSetConfig | undefined,
+): RuleSetConfig | undefined {
+  if (!baseRules && !overrideRules) {
+    return undefined;
+  }
+
+  return {
+    "metadata-required-non-empty": {
+      ...baseRules?.["metadata-required-non-empty"],
+      ...overrideRules?.["metadata-required-non-empty"],
+    },
+    "no-trailing-spaces": {
+      ...baseRules?.["no-trailing-spaces"],
+      ...overrideRules?.["no-trailing-spaces"],
+    },
+    "no-multiple-blank-lines": {
+      ...baseRules?.["no-multiple-blank-lines"],
+      ...overrideRules?.["no-multiple-blank-lines"],
+    },
+    "require-links": {
+      ...baseRules?.["require-links"],
+      ...overrideRules?.["require-links"],
+    },
+  };
+}
+
+function matchesPattern(filePath: string, pattern: string): boolean {
+  const normalizedPath = filePath.replaceAll("\\", "/");
+  const normalizedPattern = pattern.replaceAll("\\", "/");
+  const fileName = basename(normalizedPath);
+
+  if (!normalizedPattern.includes("/")) {
+    return wildcardToRegExp(normalizedPattern).test(fileName);
+  }
+
+  return wildcardToRegExp(normalizedPattern).test(normalizedPath);
+}
+
+function wildcardToRegExp(pattern: string): RegExp {
+  let source = "^";
+
+  for (let index = 0; index < pattern.length; index += 1) {
+    const character = pattern[index];
+    const nextCharacter = pattern[index + 1];
+
+    if (character === "*" && nextCharacter === "*") {
+      source += ".*";
+      index += 1;
+      continue;
+    }
+
+    if (character === "*") {
+      source += "[^/]*";
+      continue;
+    }
+
+    if (character === "?") {
+      source += ".";
+      continue;
+    }
+
+    source += escapeRegExp(character);
+  }
+
+  source += "$";
+  return new RegExp(source);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&");
 }

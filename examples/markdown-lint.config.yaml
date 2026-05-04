@@ -5,3 +5,10 @@ rules:
     enabled: true
   no-multiple-blank-lines:
     enabled: true
+  require-links:
+    enabled: true
+overrides:
+  - files: ["README.md"]
+    rules:
+      require-links:
+        enabled: false

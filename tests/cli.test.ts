@@ -224,6 +224,55 @@ Body with spaces   `,
     expect(result.stdout).toBe(`${filePath}: OK\nChecked 1 file(s), found 0 issue(s).\n`);
     expect(result.stderr).toBe("");
   });
+
+  it("applies overrides based on file name from config", () => {
+    const directory = createDirectory();
+    const readmePath = join(directory, "README.md");
+    const otherPath = join(directory, "guide.md");
+    const configPath = join(directory, "markdown-lint.config.yaml");
+
+    writeFileSync(
+      readmePath,
+      `---
+title: Readme
+---
+
+Body without links`,
+      "utf8",
+    );
+    writeFileSync(
+      otherPath,
+      `---
+title: Guide
+---
+
+Body without links`,
+      "utf8",
+    );
+    writeFileSync(
+      configPath,
+      `rules:
+  require-links:
+    enabled: true
+overrides:
+  - files: ["README.md"]
+    rules:
+      require-links:
+        enabled: false
+`,
+      "utf8",
+    );
+
+    const result = runCli([directory], { cwd: directory });
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe(
+      `${otherPath}:1:1 error require-links Document must contain at least one link.\n` +
+        `${readmePath}: OK\n` +
+        "Checked 2 file(s), found 1 issue(s).\n",
+    );
+    expect(result.stderr).toBe("");
+  });
 });
 
 function createMarkdownFile(content: string, fileName = "sample.md"): string {

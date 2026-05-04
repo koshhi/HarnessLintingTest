@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { lintMarkdown } from "../src/lintMarkdown";
+import { resolveLintConfig } from "../src/config";
 
 describe("lintMarkdown", () => {
   it("returns no issues for a valid markdown document", () => {
@@ -55,6 +56,56 @@ Content`;
           message: 'Required metadata field "title" cannot be empty.',
           severity: "error",
           line: 2,
+          column: 1,
+        },
+      ],
+    });
+  });
+
+  it('reports an error when the title metadata is an explicit YAML empty string', () => {
+    const markdown = `---
+title: ""
+---
+
+Content`;
+
+    expect(lintMarkdown(markdown)).toEqual({
+      ok: false,
+      issues: [
+        {
+          ruleId: "metadata-required-non-empty",
+          message: 'Required metadata field "title" cannot be empty.',
+          severity: "error",
+          line: 2,
+          column: 1,
+        },
+      ],
+    });
+  });
+
+  it("reports an error when the title metadata is an empty YAML block scalar", () => {
+    const markdown = `---
+title: |
+  
+---
+
+Content`;
+
+    expect(lintMarkdown(markdown)).toEqual({
+      ok: false,
+      issues: [
+        {
+          ruleId: "metadata-required-non-empty",
+          message: 'Required metadata field "title" cannot be empty.',
+          severity: "error",
+          line: 2,
+          column: 1,
+        },
+        {
+          ruleId: "no-trailing-spaces",
+          message: "Trailing spaces are not allowed.",
+          severity: "error",
+          line: 3,
           column: 1,
         },
       ],
@@ -186,5 +237,97 @@ Body`;
       ok: true,
       issues: [],
     });
+  });
+
+  it("supports requiring links when the rule is enabled", () => {
+    const markdown = `---
+title: Hello
+---
+
+Body without links`;
+
+    expect(
+      lintMarkdown(markdown, {
+        config: {
+          rules: {
+            "require-links": { enabled: true },
+          },
+        },
+      }),
+    ).toEqual({
+      ok: false,
+      issues: [
+        {
+          ruleId: "require-links",
+          message: "Document must contain at least one link.",
+          severity: "error",
+          line: 1,
+          column: 1,
+        },
+      ],
+    });
+  });
+
+  it("passes require-links when the document contains a markdown link", () => {
+    const markdown = `---
+title: Hello
+---
+
+See [docs](https://example.com).`;
+
+    expect(
+      lintMarkdown(markdown, {
+        config: {
+          rules: {
+            "require-links": { enabled: true },
+          },
+        },
+      }),
+    ).toEqual({
+      ok: true,
+      issues: [],
+    });
+  });
+
+  it("supports file-specific overrides such as disabling require-links for README.md", () => {
+    const markdown = `---
+title: Hello
+---
+
+Body without links`;
+
+    expect(
+      lintMarkdown(markdown, {
+        filePath: "/repo/README.md",
+        config: {
+          rules: {
+            "require-links": { enabled: true },
+          },
+          overrides: [
+            {
+              files: ["README.md"],
+              rules: {
+                "require-links": { enabled: false },
+              },
+            },
+          ],
+        },
+      }),
+    ).toEqual({
+      ok: true,
+      issues: [],
+    });
+  });
+
+  it("rejects invalid runtime config values instead of silently accepting them", () => {
+    expect(() =>
+      resolveLintConfig({
+        rules: {
+          "no-trailing-spaces": {
+            enabled: "false" as unknown as boolean,
+          },
+        },
+      }),
+    ).toThrow('Rule "enabled" must be a boolean.');
   });
 });

@@ -11,4 +11,3 @@
 
 - This repository includes a VS Code extension under `vscode-extension/` that publishes Markdown lint diagnostics to the editor and the `Problems` panel.
 - Those editor diagnostics are useful for the human editing flow, but agent verification should still rely on the CLI because the agent does not have direct access to the VS Code diagnostics panel in this environment.
-
