@@ -7,6 +7,12 @@
     "markdown-lint": "./src/cli.ts"
   },
   "scripts": {
+    "extension:build": "npm --prefix ./vscode-extension run compile",
+    "extension:watch": "npm --prefix ./vscode-extension run watch",
+    "extension:pack": "npm --prefix ./vscode-extension run pack",
+    "extension:install-local": "node ./scripts/install-local-extension.mjs",
+    "extension:dev": "node ./scripts/extension-dev.mjs",
+    "postinstall": "npm --prefix ./vscode-extension install",
     "test": "vitest run",
     "lint:md": "node src/cli.ts"
   },

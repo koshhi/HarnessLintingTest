@@ -239,6 +239,66 @@ Body`;
     });
   });
 
+  it("supports validating multiple required metadata fields", () => {
+    const markdown = `---
+title: Hello
+description: Short summary
+author: Cesar
+---
+
+Body`;
+
+    expect(
+      lintMarkdown(markdown, {
+        rules: {
+          "metadata-required-non-empty": {
+            fields: ["title", "description", "author"],
+          },
+        },
+      }),
+    ).toEqual({
+      ok: true,
+      issues: [],
+    });
+  });
+
+  it("reports one issue per missing or empty required metadata field", () => {
+    const markdown = `---
+title: Hello
+description:
+---
+
+Body`;
+
+    expect(
+      lintMarkdown(markdown, {
+        rules: {
+          "metadata-required-non-empty": {
+            fields: ["title", "description", "author"],
+          },
+        },
+      }),
+    ).toEqual({
+      ok: false,
+      issues: [
+        {
+          ruleId: "metadata-required-non-empty",
+          message: 'Required metadata field "author" is missing.',
+          severity: "error",
+          line: 1,
+          column: 1,
+        },
+        {
+          ruleId: "metadata-required-non-empty",
+          message: 'Required metadata field "description" cannot be empty.',
+          severity: "error",
+          line: 3,
+          column: 1,
+        },
+      ],
+    });
+  });
+
   it("supports requiring links when the rule is enabled", () => {
     const markdown = `---
 title: Hello
@@ -329,5 +389,18 @@ Body without links`;
         },
       }),
     ).toThrow('Rule "enabled" must be a boolean.');
+  });
+
+  it('rejects configs that define both "field" and "fields"', () => {
+    expect(() =>
+      resolveLintConfig({
+        rules: {
+          "metadata-required-non-empty": {
+            field: "title",
+            fields: ["title", "description"],
+          },
+        },
+      }),
+    ).toThrow('Rule "metadata-required-non-empty" cannot define both "field" and "fields".');
   });
 });

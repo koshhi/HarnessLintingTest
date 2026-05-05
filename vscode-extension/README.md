@@ -2,7 +2,31 @@
 
 This extension publishes diagnostics from the local Markdown linter into the editor and the `Problems` panel.
 
-## Run it locally
+## Recommended workflows
+
+### Normal use
+
+From the repository root:
+
+```bash
+npm run extension:install-local
+```
+
+If VS Code is already open, run `Developer: Reload Window`.
+
+### Development
+
+From the repository root:
+
+```bash
+npm run extension:dev
+```
+
+Then open the repository root in VS Code and run `Run Markdown Lint Extension` from `Run and Debug`.
+
+Use `Developer: Reload Window` in the `Extension Development Host` after code changes.
+
+### Legacy direct debug flow
 
 1. Open `/Users/cesar/Projects/HarnessLintingTest/vscode-extension` in VS Code.
 2. Run `npm install`.

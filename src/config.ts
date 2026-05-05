@@ -9,6 +9,7 @@ export type ToggleRuleConfig = {
 
 export type MetadataRequiredNonEmptyRuleConfig = ToggleRuleConfig & {
   field?: string;
+  fields?: string[];
 };
 
 export type RequireLinksRuleConfig = ToggleRuleConfig;
@@ -34,7 +35,7 @@ export type ResolvedLintConfig = {
   rules: {
     "metadata-required-non-empty": {
       enabled: boolean;
-      field: string;
+      fields: string[];
     };
     "no-trailing-spaces": {
       enabled: boolean;
@@ -73,7 +74,9 @@ export function resolveLintConfigForFile(
     rules: {
       "metadata-required-non-empty": {
         enabled: mergedRules?.["metadata-required-non-empty"]?.enabled ?? true,
-        field: mergedRules?.["metadata-required-non-empty"]?.field ?? DEFAULT_REQUIRED_METADATA_FIELD,
+        fields:
+          mergedRules?.["metadata-required-non-empty"]?.fields ??
+          toFieldsArray(mergedRules?.["metadata-required-non-empty"]?.field),
       },
       "no-trailing-spaces": {
         enabled: mergedRules?.["no-trailing-spaces"]?.enabled ?? true,
@@ -236,6 +239,30 @@ function normalizeMetadataRule(input: unknown): MetadataRequiredNonEmptyRuleConf
     result.field = input.field.trim();
   }
 
+  if (input.fields !== undefined) {
+    if (!Array.isArray(input.fields) || input.fields.length === 0) {
+      throw new Error(
+        'Rule "metadata-required-non-empty.fields" must be a non-empty array of strings.',
+      );
+    }
+
+    result.fields = input.fields.map((value) => {
+      if (typeof value !== "string" || value.trim() === "") {
+        throw new Error(
+          'Rule "metadata-required-non-empty.fields" must be a non-empty array of strings.',
+        );
+      }
+
+      return value.trim();
+    });
+  }
+
+  if (result.field && result.fields) {
+    throw new Error(
+      'Rule "metadata-required-non-empty" cannot define both "field" and "fields".',
+    );
+  }
+
   return result;
 }
 
@@ -356,4 +383,8 @@ function wildcardToRegExp(pattern: string): RegExp {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&");
+}
+
+function toFieldsArray(field: string | undefined): string[] {
+  return field ? [field] : [DEFAULT_REQUIRED_METADATA_FIELD];
 }

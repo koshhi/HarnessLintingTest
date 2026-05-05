@@ -15,13 +15,14 @@ describe("markdown CLI", () => {
   });
 
   it("returns success for a valid markdown file", () => {
+    const directory = createDirectory();
     const filePath = createMarkdownFile(`---
 title: Hello
 ---
 
-Body`);
+Body`, "sample.md", directory);
 
-    const result = runCli([filePath]);
+    const result = runCli([filePath], { cwd: directory });
 
     expect(result.status).toBe(0);
     expect(result.stdout).toBe(`${filePath}: OK\nChecked 1 file(s), found 0 issue(s).\n`);
@@ -29,14 +30,15 @@ Body`);
   });
 
   it("returns issues for an invalid markdown file", () => {
+    const directory = createDirectory();
     const filePath = createMarkdownFile(`---
 title:
 ---
 
 
-Body with spaces   `);
+Body with spaces   `, "sample.md", directory);
 
-    const result = runCli([filePath]);
+    const result = runCli([filePath], { cwd: directory });
 
     expect(result.status).toBe(1);
     expect(result.stdout).toBe(
@@ -62,13 +64,14 @@ Body with spaces   `);
   });
 
   it("prints JSON output when requested", () => {
+    const directory = createDirectory();
     const filePath = createMarkdownFile(`---
 title:
 ---
 
-Body`);
+Body`, "sample.md", directory);
 
-    const result = runCli(["--format", "json", filePath]);
+    const result = runCli(["--format", "json", filePath], { cwd: directory });
 
     expect(result.status).toBe(1);
     expect(result.stderr).toBe("");
@@ -95,18 +98,20 @@ Body`);
   });
 
   it("supports linting multiple files in one command", () => {
+    const validDirectory = createDirectory();
+    const invalidDirectory = createDirectory();
     const validFilePath = createMarkdownFile(`---
 title: Hello
 ---
 
-Body`, "valid.md");
+Body`, "valid.md", validDirectory);
     const invalidFilePath = createMarkdownFile(`---
 title:
 ---
 
-Body`, "invalid.md");
+Body`, "invalid.md", invalidDirectory);
 
-    const result = runCli([validFilePath, invalidFilePath]);
+    const result = runCli([validFilePath, invalidFilePath], { cwd: validDirectory });
 
     expect(result.status).toBe(1);
     expect(result.stdout).toBe(
@@ -146,7 +151,7 @@ Body`,
     );
     writeFileSync(ignoredFilePath, "not markdown", "utf8");
 
-    const result = runCli([directory]);
+    const result = runCli([directory], { cwd: directory });
 
     expect(result.status).toBe(1);
     expect(result.stdout).toBe(
@@ -275,9 +280,11 @@ overrides:
   });
 });
 
-function createMarkdownFile(content: string, fileName = "sample.md"): string {
-  const directory = createDirectory();
-
+function createMarkdownFile(
+  content: string,
+  fileName = "sample.md",
+  directory = createDirectory(),
+): string {
   const filePath = join(directory, fileName);
   writeFileSync(filePath, content, "utf8");
   return filePath;

@@ -5,6 +5,11 @@
   "version": "0.0.1",
   "publisher": "local",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/koshhi/HarnessLintingTest.git"
+  },
+  "license": "ISC",
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -26,9 +31,11 @@
   },
   "scripts": {
     "compile": "node ./scripts/build.mjs",
-    "watch": "node ./scripts/build.mjs --watch"
+    "watch": "node ./scripts/build.mjs --watch",
+    "pack": "node ./scripts/prepare-package.mjs && npm run compile && npx @vscode/vsce package --out ./markdown-lint-prototype.vsix"
   },
   "devDependencies": {
+    "@vscode/vsce": "^3.6.0",
     "@types/node": "^24.10.1",
     "@types/vscode": "^1.90.0",
     "esbuild": "^0.25.12"

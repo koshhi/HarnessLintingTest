@@ -39,7 +39,7 @@ export function lintMarkdown(
     validateRequiredMetadata(
       lines,
       issues,
-      resolvedConfig.rules["metadata-required-non-empty"].field,
+      resolvedConfig.rules["metadata-required-non-empty"].fields,
     );
   }
 
@@ -66,7 +66,7 @@ export function lintMarkdown(
 function validateRequiredMetadata(
   lines: string[],
   issues: LintIssue[],
-  requiredField: string,
+  requiredFields: string[],
 ): void {
   const frontMatter = parseFrontMatter(lines);
 
@@ -81,27 +81,29 @@ function validateRequiredMetadata(
     return;
   }
 
-  const value = frontMatter.fields[requiredField];
+  for (const requiredField of requiredFields) {
+    const value = frontMatter.fields[requiredField];
 
-  if (value === undefined) {
-    issues.push({
-      ruleId: "metadata-required-non-empty",
-      message: `Required metadata field "${requiredField}" is missing.`,
-      severity: "error",
-      line: 1,
-      column: 1,
-    });
-    return;
-  }
+    if (value === undefined) {
+      issues.push({
+        ruleId: "metadata-required-non-empty",
+        message: `Required metadata field "${requiredField}" is missing.`,
+        severity: "error",
+        line: 1,
+        column: 1,
+      });
+      continue;
+    }
 
-  if (isMetadataValueEmpty(value)) {
-    issues.push({
-      ruleId: "metadata-required-non-empty",
-      message: `Required metadata field "${requiredField}" cannot be empty.`,
-      severity: "error",
-      line: frontMatter.lineNumbers[requiredField] ?? 1,
-      column: 1,
-    });
+    if (isMetadataValueEmpty(value)) {
+      issues.push({
+        ruleId: "metadata-required-non-empty",
+        message: `Required metadata field "${requiredField}" cannot be empty.`,
+        severity: "error",
+        line: frontMatter.lineNumbers[requiredField] ?? 1,
+        column: 1,
+      });
+    }
   }
 }
 

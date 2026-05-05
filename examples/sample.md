@@ -1,6 +1,7 @@
 ---
-title: Example Document
+title: Sample Doc
 author:
+
 ---
 
 # Example Document

@@ -1,7 +1,3 @@
----
-title: HarnessLintingTest
----
-
 # HarnessLintingTest
 
 Simple Markdown linter prototype built with TypeScript.
@@ -12,6 +8,7 @@ It includes:
 - Config loading from JSON or YAML.
 - A VS Code extension that publishes workspace-wide diagnostics in the editor and `Problems` panel.
 - Example Markdown content and tests.
+- Two extension workflows: local installation for normal use and `Extension Development Host` for rule development.
 
 ## Requirements
 
@@ -23,6 +20,8 @@ It includes:
 ```bash
 npm install
 ```
+
+That single command also installs the dependencies needed by the VS Code extension under `vscode-extension/`.
 
 ## Run the CLI
 
@@ -75,7 +74,10 @@ Example config:
 ```yaml
 rules:
   metadata-required-non-empty:
-    field: title
+    fields:
+      - title
+      - description
+      - author
   no-trailing-spaces:
     enabled: true
   no-multiple-blank-lines:
@@ -91,6 +93,8 @@ overrides:
 
 `overrides` lets you change rules by file name or path pattern. For example, the config above requires links by default but disables that rule for `README.md`.
 
+`metadata-required-non-empty` supports either a single `field` or multiple `fields`.
+
 ## VS Code Extension
 
 The extension lives in [vscode-extension](./vscode-extension) and validates Markdown files across the workspace, including files that are not already open in an editor. It refreshes diagnostics on:
@@ -102,7 +106,60 @@ The extension lives in [vscode-extension](./vscode-extension) and validates Mark
 - config file changes
 - manual refresh through `Markdown Lint: Refresh Diagnostics`
 
-To run it locally:
+### Normal Use: Install Locally In VS Code
+
+This is the recommended flow if you want to use the extension like a normal local tool.
+
+1. Run:
+
+```bash
+npm run extension:install-local
+```
+
+2. If VS Code is already open, run `Developer: Reload Window`.
+3. Open this repository in VS Code and edit any Markdown file.
+
+If the `code` command is not available in your shell, install manually from the generated VSIX:
+
+1. Run:
+
+```bash
+npm run extension:pack
+```
+
+2. In VS Code, run `Extensions: Install from VSIX...`
+3. Pick `vscode-extension/markdown-lint-prototype.vsix`
+
+### Development: Work On Rules Or Extension Code
+
+This is the recommended flow if you are changing `src/lintMarkdown.ts`, `src/config.ts`, or `vscode-extension/src/extension.ts`.
+
+1. Start the watcher from the repo root:
+
+```bash
+npm run extension:dev
+```
+
+2. In VS Code, open the repository root.
+3. Go to `Run and Debug`.
+4. Run `Run Markdown Lint Extension`.
+5. Keep the watcher running while you edit code.
+6. After code changes, use `Developer: Reload Window` inside the `Extension Development Host`.
+
+`F5` remains a development/debug flow, not the primary user flow.
+
+### Quick Reference
+
+| What changed | Action needed | Reinstall VSIX |
+| --- | --- | --- |
+| Markdown content (`.md`) | Nothing extra; diagnostics should refresh automatically | No |
+| Linter config (`markdown-lint.config.*`) | Nothing extra; diagnostics should refresh automatically | No |
+| Linter or extension code (`src/*.ts`, `vscode-extension/src/*.ts`) | Recompile via watcher and run `Developer: Reload Window` | No |
+| Final local validation in normal VS Code | Run `npm run extension:install-local` | Yes |
+
+### Legacy Debug Flow
+
+If you still want to run the extension directly from the extension folder:
 
 1. Open `vscode-extension/` in VS Code.
 2. Run `npm install`.
